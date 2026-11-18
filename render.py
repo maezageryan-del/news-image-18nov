@@ -3,7 +3,7 @@
 render.py — compose the v2 front page for "The World in One Day",
 Wednesday 18 November 2026 (make.fun bounty news-image-20261118).
 
-Reads stories-v2.json (the day's news, 42 stories) and the engraved
+Reads stories-v2.json (the day's news, 47 stories) and the engraved
 artwork in art/, and writes a single 1024x1024 front page to
 entry.png beside this file.
 
@@ -14,7 +14,7 @@ sheet (art/spots-grid.png, 3 columns x 2 rows); this script crops the
 cells out, converts every piece to a shared sepia duotone so the page
 reads as one printed sheet, and lays the page out like a broadsheet:
 masthead, illustrated lead, two wide illustrated panels, four small
-illustrated panels, a 15-item news briefs block and a 20-line
+illustrated panels, a 15-item news briefs block and a 25-line
 "Also today" band.
 """
 
@@ -260,10 +260,10 @@ def main():
     y = briefs_bottom + 8
     tracked(draw, (MARGIN, y), "ALSO TODAY", font(SANS_B, 11), ACCENT)
     y += 16
-    aw = (WIDTH - 3 * 12) // 4
+    aw = (WIDTH - 4 * 12) // 5
     f_also = font(SERIF, 10)
     for idx, item in enumerate(data["also"]):
-        col, row = idx % 4, idx // 4
+        col, row = idx % 5, idx // 5
         x = MARGIN + col * (aw + 12)
         line = item
         while draw.textlength(line, font=f_also) > aw and len(line) > 8:
@@ -271,7 +271,8 @@ def main():
         if line != item:
             line = line.rstrip(" .,;:") + "…"
         draw.text((x, y + row * 12), line, font=f_also, fill=INK)
-    also_bottom = y + 5 * 12 + 3
+    also_rows = (len(data["also"]) + 4) // 5
+    also_bottom = y + also_rows * 12 + 3
     hline(draw, also_bottom, w=1)
 
     # ---- footer -------------------------------------------------------
