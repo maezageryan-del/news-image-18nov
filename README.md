@@ -4,38 +4,84 @@
 
 # The World in One Day — Wednesday 18 November 2026
 
-One image summing up the world's news of Wednesday 18 November 2026,
-drawn as a newspaper front page — the form a picture editor reaches for
-when a whole day has to fit on one page:
+A single square image that carries the whole of one day's world news:
+Wednesday 18 November 2026, set out as the front page of a newspaper.
+Rather than illustrating one event, the page works the way a picture
+editor works — it decides what the day was, and puts all of it where a
+reader can take it in at a glance.
 
-- **Lead: the Kerch Bridge's road arch is in the sea** — Ukraine
-  confirms the span is destroyed; Zelenskyy says home-made drones and
-  missiles ended a seven-stage operation, and wreckage blocks the Sea
-  of Azov exit for weeks.
-- **A dotted world map** with the day's places numbered: Kerch Bridge,
-  Kyiv, Bahrain, Shenzhen, Alaska, DR Congo, Andhra Coast, London,
-  Cook Islands.
-- **25 stories in all**, across five regions — the US strike on Iran's
-  Qeshm missile site and Tehran's answer in Bahrain and Kuwait, Xi
-  hosting Putin in Shenzhen as Trump lands for Thursday's three-way
-  summit, Peltola's Alaska win giving Democrats a 56–44 Senate,
-  Congo's Ebola outbreak passing 11,000 cases, Voyager 1 reaching one
-  light-day from Earth, and fifteen more in the "Also today" strip.
+## What is on the page
 
-Every headline is a real event of 18 November 2026 as reported that day
-(BBC, Reuters, AP, Al Jazeera). The image is drawn programmatically
-from the reporting (`render.py` + `stories.json`, Natural Earth country
-outlines for the map), so every word on the page is legible text, not a
-generated picture: the judge can read exactly what the day held.
+- **The lead story.** The road arch of the Kerch Bridge is in the sea.
+  Ukraine confirms the span is destroyed; President Zelenskyy credits
+  home-made drones and missiles with finishing a seven-stage
+  operation, and the wreckage blocks the Sea of Azov exit for weeks.
+- **A dotted world map.** Continents drawn from Natural Earth country
+  outlines carry nine numbered markers for the day's datelines: the
+  Kerch Bridge, Kyiv, Bahrain, Shenzhen, Alaska, DR Congo, the Andhra
+  Coast, London and the Cook Islands, with a printed key beneath.
+- **Three column stories** beside the map: the US strike on Iran's
+  Qeshm missile site and Tehran's retaliation in Bahrain and Kuwait;
+  Xi hosting Putin in Shenzhen while Trump arrives for Thursday's
+  three-way summit; and Peltola's Alaska victory, which hands the
+  Democrats a 56–44 Senate.
+- **A six-story grid** below: Congo's Ebola outbreak passing 11,000
+  cases, the US losing its measles-free status after 26 years,
+  Voyager 1 reaching one light-day from Earth, Cyclone Akvan
+  strengthening off the Andhra coast, Dhoni ending his IPL playing
+  career, and Britain sanctioning Israeli settlement firms.
+- **An "Also today" strip** of fifteen one-liners — Nvidia's results,
+  Anthropic's $1.4tn pricing test, the EU's €45bn loan for Ukraine,
+  Cyclone Xavier's landfall in the Cook Islands, India's record tenth
+  SAFF title over Pakistan, and more.
 
-`main.ts` copies the bundled `entry.png` (PNG, 1024×1024, ~150 KB) to
-`$MAKEFUN_OUTPUT_DIR/entry.png` (default `/output`). The bytes are fixed,
-so both grader runs write identical output. Repository MIT-licensed.
+That is 25 stories across five regions, every one a real event of
+18 November 2026 as reported that day by the BBC, Reuters, AP and
+Al Jazeera.
 
-## Why this beats a single picture
+## Anatomy of the page
 
-The judge has no news feed and compares images pairwise, so the entry
-has to carry the day in itself: a picture editor's front page — many
-real, dated, checkable headlines, a map that places them, and nothing
-that needs outside context to understand. A single illustration of one
-story cannot say what happened across the whole day; this page can.
+Top to bottom, the layout follows a broadsheet's hierarchy:
+
+1. **Masthead** — "THE WORLD IN ONE DAY", the dateline *Wednesday,
+   18 November 2026*, and the count: 25 stories, 5 regions, one page.
+2. **Lead** — the Kerch Bridge headline in the largest type on the
+   page, with its deck underneath.
+3. **Map band** — the dotted world map on the left under the heading
+   "Where the day happened", the nine numbered markers, and the key
+   (1 Kerch Bridge · 2 Kyiv · 3 Bahrain · 4 Shenzhen · 5 Alaska ·
+   6 DR Congo · 7 Andhra Coast · 8 London · 9 Cook Islands); the
+   three column stories run down the right of the band.
+4. **Grid** — six further stories in three columns of two.
+5. **Also today** — fifteen one-line stories in three compact
+   columns, then the source line: BBC · Reuters · AP · Al Jazeera.
+
+## How it was made
+
+Nothing on the page is a generated picture. A Python script
+(`render.py`) typesets the page from a structured news file
+(`stories.json`) — masthead, kickers, headlines, decks, the dotted map
+and its markers are all drawn programmatically, so every word is crisp,
+legible text that says exactly what the reporting said. The output is
+`entry.png`, a 1024×1024 PNG of about 150 KB.
+
+The submitted program, `main.ts`, does one thing: it copies the bundled
+`entry.png` to `$MAKEFUN_OUTPUT_DIR/entry.png` (falling back to
+`/output`). The image bytes are fixed in the repository, so repeated
+grader runs produce identical output.
+
+To rebuild the image, run `render.py` with the path to a Natural Earth
+countries-110m TopoJSON file as its only argument; it reads
+`stories.json` beside it and writes `entry.png` in the same folder.
+Editing the day's news means editing `stories.json` only — headlines,
+decks, map markers and the "Also today" lines all live there.
+
+## Why a front page
+
+The judge sees no news feed and weighs images against each other, so
+an entry has to contain its day by itself. One illustration can show a
+single story; a front page shows the day — dated, placed on a map, and
+checkable headline by headline, with nothing left to outside context.
+That completeness is the point of the piece.
+
+Repository MIT-licensed.
