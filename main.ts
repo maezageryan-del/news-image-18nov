@@ -1,67 +1,75 @@
-/**
- * Entry point for the news-image-20261118 submission.
- *
- * The artwork for this entry — a one-page newspaper front page for
- * Wednesday 18 November 2026 — was rendered ahead of time from
- * stories.json and is committed to this repository as entry.png.
- * There is nothing to draw at run time: this program's whole job is
- * to deliver that fixed image to the directory the harness names in
- * the MAKEFUN_OUTPUT_DIR environment variable.
- */
+// main.ts — entrypoint for "The World in One Day — Wednesday 18 November 2026"
+// (make.fun bounty news-image-20261118, v2).
+//
+// The entry is a single front-page image, entry.png, composed by
+// render.py from stories-v2.json and the engraved artwork in art/.
+// This entrypoint delivers that image: it copies entry.png from
+// beside this file into the directory named by MAKEFUN_OUTPUT_DIR,
+// then verifies the copy landed intact — same byte count, and a real
+// PNG signature — before reporting success.
 
-import { copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Name of the committed artwork, here and in the output directory. */
-const IMAGE_NAME = "entry.png";
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-/** Absolute path of the entry.png committed beside this file. */
-function sourceImage(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return resolve(here, IMAGE_NAME);
+function fail(message: string): never {
+  console.error(`main.ts: ${message}`);
+  process.exit(1);
 }
 
-/** The output directory from the environment, or a thrown error. */
-function outputDirectory(): string {
-  const dir = process.env.MAKEFUN_OUTPUT_DIR;
-  if (dir === undefined || dir.trim() === "") {
-    throw new Error(
-      "MAKEFUN_OUTPUT_DIR is not set; nowhere to publish entry.png",
-    );
-  }
-  return resolve(dir);
+function hasPngSignature(path: string): boolean {
+  const head = readFileSync(path).subarray(0, PNG_MAGIC.length);
+  return PNG_MAGIC.every((byte, i) => head[i] === byte);
+}
+
+// The front page is a fixed-format entry: exactly 1024x1024. The PNG
+// IHDR chunk stores width and height as big-endian uint32s at bytes
+// 16..24, right after the signature and the chunk header.
+function isFrontPageSize(path: string): boolean {
+  const head = readFileSync(path).subarray(0, 24);
+  const width = head.readUInt32BE(16);
+  const height = head.readUInt32BE(20);
+  return width === 1024 && height === 1024;
 }
 
 function main(): void {
-  const src = sourceImage();
-  if (!existsSync(src)) {
-    throw new Error(`source image is missing: ${src}`);
+  const outDir = process.env.MAKEFUN_OUTPUT_DIR;
+  if (!outDir) {
+    fail("MAKEFUN_OUTPUT_DIR is not set; nowhere to deliver entry.png");
   }
 
-  const dir = outputDirectory();
-  mkdirSync(dir, { recursive: true });
-  const dest = join(dir, IMAGE_NAME);
-
-  copyFileSync(src, dest);
-
-  const expected = statSync(src).size;
-  const bytes = statSync(dest).size;
-  if (bytes === 0) {
-    throw new Error(`published file is empty: ${dest}`);
+  const here = dirname(fileURLToPath(import.meta.url));
+  const source = join(here, "entry.png");
+  if (!existsSync(source)) {
+    fail(`entry.png not found beside main.ts (${source})`);
   }
-  if (bytes !== expected) {
-    throw new Error(
-      `published file is incomplete: ${dest} has ${bytes} of ${expected} bytes`,
-    );
+  const sourceSize = statSync(source).size;
+  if (sourceSize === 0) {
+    fail("entry.png is empty");
   }
-  console.log(`published ${dest} (${bytes} bytes)`);
+  if (!hasPngSignature(source)) {
+    fail("entry.png does not start with a PNG signature");
+  }
+  if (!isFrontPageSize(source)) {
+    fail("entry.png is not the 1024x1024 front page");
+  }
+
+  mkdirSync(outDir, { recursive: true });
+  const dest = join(outDir, "entry.png");
+  if (dest !== source) {
+    copyFileSync(source, dest);
+  }
+
+  const destSize = statSync(dest).size;
+  if (destSize !== sourceSize) {
+    fail(`copy mismatch: source is ${sourceSize} bytes, delivered ${destSize}`);
+  }
+  if (!hasPngSignature(dest)) {
+    fail("delivered file does not start with a PNG signature");
+  }
+  console.log(`main.ts: delivered entry.png (${destSize} bytes) to ${dest}`);
 }
 
-try {
-  main();
-} catch (err) {
-  const message = err instanceof Error ? err.message : String(err);
-  console.error(`news-image-20261118: ${message}`);
-  process.exit(1);
-}
+main();
