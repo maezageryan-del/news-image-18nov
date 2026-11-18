@@ -5,7 +5,7 @@
 ![Reward](https://make.fun/badge/news-image-20261118/maezageryan-del/news-image-18nov/reward.svg)
 
 One front page that carries the whole of Wednesday 18 November 2026:
-**42 stories from six continents**, with the day's seven biggest
+**47 stories from six continents**, with the day's seven biggest
 stories illustrated as engravings. An entry for the make.fun bounty
 [news-image-20261118](https://make.fun/bounty/news-image-20261118) —
 see the [leaderboard](https://make.fun/bounty/news-image-20261118/leaderboard).
@@ -32,7 +32,7 @@ see the [leaderboard](https://make.fun/bounty/news-image-20261118/leaderboard).
   Myanmar vs ASEAN, Ukraine's plea for jets, Italy's antisemitism law,
   the Atalay ruling, sliding markets, Gaza's freezing camps, the
   Siberian air crash and the Board of Peace report.
-- **Also today.** Twenty one-line briefs, from Nvidia's earnings and
+- **Also today.** Twenty-five one-line briefs, from Nvidia's earnings and
   Anthropic's $1.4tn debut to the Pope being hit by a rosary in Peru.
 
 Every story is a real event of Wednesday 18 November 2026, drawn from
@@ -41,7 +41,7 @@ the day's reporting by the BBC, Reuters, AP, Al Jazeera and AFP.
 ## How it was made
 
 The page is composed programmatically by `render.py` from
-`stories-v2.json`, which holds all 42 stories in structured form
+`stories-v2.json`, which holds all 47 stories in structured form
 (lead, panels, briefs, one-liners). The seven illustrations are
 original engravings in a shared sepia duotone: all six panels of a
 spot sheet (the Qeshm strike, the Shenzhen summit, Alaska, Congo,
