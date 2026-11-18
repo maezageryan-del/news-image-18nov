@@ -1,87 +1,110 @@
-[![make.fun · news-image-20261118](https://make.fun/badge/news-image-20261118.svg)](https://make.fun/bounty/news-image-20261118)
-[![rank](https://make.fun/badge/news-image-20261118/maezageryan-del/news-image-18nov/rank.svg)](https://make.fun/bounty/news-image-20261118/leaderboard)
-[![reward](https://make.fun/badge/news-image-20261118/maezageryan-del/news-image-18nov/reward.svg)](https://make.fun/bounty/news-image-20261118)
-
 # The World in One Day — Wednesday 18 November 2026
 
-A single square image that carries the whole of one day's world news:
-Wednesday 18 November 2026, set out as the front page of a newspaper.
-Rather than illustrating one event, the page works the way a picture
-editor works — it decides what the day was, and puts all of it where a
-reader can take it in at a glance.
+![news-image-20261118](https://make.fun/badge/news-image-20261118.svg)
+![rank](https://make.fun/badge/news-image-20261118/maezageryan-del/news-image-18nov/rank.svg)
+![reward](https://make.fun/badge/news-image-20261118/maezageryan-del/news-image-18nov/reward.svg)
+
+An entry for the [news-image-20261118 bounty on make.fun](https://make.fun/bounty/news-image-20261118).
+See how it is doing on the [leaderboard](https://make.fun/bounty/news-image-20261118/leaderboard).
+
+## What this is
+
+One square image — 1024 × 1024 pixels — that tries to do the job of a
+newspaper front page for a single day: Wednesday, 18 November 2026.
+Everything that mattered that day is on the page: 25 stories, five
+regions, no scrolling, no links, no second page. If you read nothing
+else that day, this page is the day.
+
+The picture itself is `entry.png`. It is fixed: the renderer drew it
+once from the day's data, and the entry ships that exact file.
 
 ## What is on the page
 
-- **The lead story.** The road arch of the Kerch Bridge is in the sea.
-  Ukraine confirms the span is destroyed; President Zelenskyy credits
-  home-made drones and missiles with finishing a seven-stage
-  operation, and the wreckage blocks the Sea of Azov exit for weeks.
-- **A dotted world map.** Continents drawn from Natural Earth country
-  outlines carry nine numbered markers for the day's datelines: the
-  Kerch Bridge, Kyiv, Bahrain, Shenzhen, Alaska, DR Congo, the Andhra
-  Coast, London and the Cook Islands, with a printed key beneath.
-- **Three column stories** beside the map: the US strike on Iran's
-  Qeshm missile site and Tehran's retaliation in Bahrain and Kuwait;
-  Xi hosting Putin in Shenzhen while Trump arrives for Thursday's
-  three-way summit; and Peltola's Alaska victory, which hands the
-  Democrats a 56–44 Senate.
-- **A six-story grid** below: Congo's Ebola outbreak passing 11,000
-  cases, the US losing its measles-free status after 26 years,
-  Voyager 1 reaching one light-day from Earth, Cyclone Akvan
-  strengthening off the Andhra coast, Dhoni ending his IPL playing
-  career, and Britain sanctioning Israeli settlement firms.
-- **An "Also today" strip** of fifteen one-liners — Nvidia's results,
-  Anthropic's $1.4tn pricing test, the EU's €45bn loan for Ukraine,
-  Cyclone Xavier's landfall in the Cook Islands, India's record tenth
-  SAFF title over Pakistan, and more.
-
-That is 25 stories across five regions, every one a real event of
-18 November 2026 as reported that day by the BBC, Reuters, AP and
-Al Jazeera.
-
-## Anatomy of the page
-
-Top to bottom, the layout follows a broadsheet's hierarchy:
-
-1. **Masthead** — "THE WORLD IN ONE DAY", the dateline *Wednesday,
-   18 November 2026*, and the count: 25 stories, 5 regions, one page.
-2. **Lead** — the Kerch Bridge headline in the largest type on the
-   page, with its deck underneath.
-3. **Map band** — the dotted world map on the left under the heading
-   "Where the day happened", the nine numbered markers, and the key
-   (1 Kerch Bridge · 2 Kyiv · 3 Bahrain · 4 Shenzhen · 5 Alaska ·
-   6 DR Congo · 7 Andhra Coast · 8 London · 9 Cook Islands); the
-   three column stories run down the right of the band.
-4. **Grid** — six further stories in three columns of two.
-5. **Also today** — fifteen one-line stories in three compact
-   columns, then the source line: BBC · Reuters · AP · Al Jazeera.
+- **Masthead.** "THE WORLD IN ONE DAY", the dateline, and the count:
+  25 stories · 5 regions · one page.
+- **The lead.** Ukraine's seven-stage operation against the Kerch
+  Bridge — its road arch in the sea, the Azov exit blocked — reported
+  with the kicker *Lead Story — Ukraine · Europe*.
+- **The map band.** A dotted world map built from Natural Earth
+  country shapes, with nine numbered markers tying the day's events
+  to the places they happened: Kerch Bridge, Kyiv, Bahrain, Shenzhen,
+  Alaska, DR Congo, the Andhra coast, London and the Cook Islands.
+- **Three columns** under the map: the US strike on Iran's Qeshm
+  missile site and the answers in Bahrain and Kuwait; Xi hosting
+  Putin in Shenzhen as Trump lands for Thursday's summit; and Mary
+  Peltola's Alaska win giving the Democrats the Senate.
+- **A six-story grid.** Congo's Ebola outbreak passing 11,000 cases;
+  the United States losing its measles-free status after 26 years;
+  Voyager 1 reaching one light-day from Earth; Cyclone Akvan
+  strengthening off the Andhra coast; Dhoni ending his IPL playing
+  career; and Britain sanctioning Israeli settlement firms.
+- **Also today.** A fifteen-item strip of one-line stories — Nvidia's
+  earnings, Anthropic's debut pricing, the World Court's Myanmar
+  ruling, Cyclone Xavier in the Cook Islands, India's SAFF title, and
+  ten more.
+- **The footer.** Sources: BBC · Reuters · AP · Al Jazeera.
 
 ## How it was made
 
-Nothing on the page is a generated picture. A Python script
-(`render.py`) typesets the page from a structured news file
-(`stories.json`) — masthead, kickers, headlines, decks, the dotted map
-and its markers are all drawn programmatically, so every word is crisp,
-legible text that says exactly what the reporting said. The output is
-`entry.png`, a 1024×1024 PNG of about 150 KB.
+The day's reporting is data, not pixels. `stories.json` holds every
+word on the page — masthead, headlines, decks, kickers, the map
+markers with their coordinates, the fifteen one-liners and the
+footer — and nothing else in the repository contains news text.
 
-The submitted program, `main.ts`, does one thing: it copies the bundled
-`entry.png` to `$MAKEFUN_OUTPUT_DIR/entry.png` (falling back to
-`/output`). The image bytes are fixed in the repository, so repeated
-grader runs produce identical output.
+`render.py` turns that data into the page. It reads a Natural Earth
+countries TopoJSON file (110 m resolution) whose path is passed on
+the command line, projects the country shapes onto an equirectangular
+grid, and fills the land with dots. On top of that map band it lays
+out the whole front page with the Pillow imaging library: masthead
+and rules first, then the lead, the map, the three columns, the
+six-story grid, the "Also today" strip and the footer. Change the
+JSON and the same program draws a different day.
 
-To rebuild the image, run `render.py` with the path to a Natural Earth
-countries-110m TopoJSON file as its only argument; it reads
-`stories.json` beside it and writes `entry.png` in the same folder.
-Editing the day's news means editing `stories.json` only — headlines,
-decks, map markers and the "Also today" lines all live there.
+`main.ts` is the entry point the bounty runs. The image is already
+drawn, so the program simply copies `entry.png` into the directory
+named by the `MAKEFUN_OUTPUT_DIR` environment variable, checking
+that both the variable and the source file are there and reporting
+anything that goes wrong.
 
-## Why a front page
+## Rebuilding the picture
 
-The judge sees no news feed and weighs images against each other, so
-an entry has to contain its day by itself. One illustration can show a
-single story; a front page shows the day — dated, placed on a map, and
-checkable headline by headline, with nothing left to outside context.
-That completeness is the point of the piece.
+The committed `entry.png` is the entry; you do not need to rebuild
+it. If you want to see the renderer work:
 
-Repository MIT-licensed.
+```sh
+pip install pillow
+python3 render.py /path/to/countries-110m.json
+```
+
+That writes a fresh `entry.png` in the current directory from
+whatever `stories.json` sits beside the script. Any Natural Earth
+countries file in TopoJSON form will do as the argument — the 110 m
+set is what the map band was designed against, coarse enough that
+the dot grid stays legible at this size. To draw a different day,
+replace the contents of `stories.json` (headlines, decks, kickers,
+marker names and coordinates, one-liners) and run it again; no code
+changes are needed.
+
+## Why a front page?
+
+A feed never ends and never decides; a front page does both. It has
+to rank the day — one lead, a handful of supporting stories, a strip
+of briefs — and it has to fit. Compressing 18 November 2026 into a
+single square is an editing exercise: the Kerch Bridge leads because
+it changes a war; Voyager 1 sits in the grid because it changes only
+our sense of scale; the rosary that hit the Pope is a one-liner
+because one line is what it deserves. The constraint is the point.
+
+## Layout of this repository
+
+| File | Purpose |
+| --- | --- |
+| `entry.png` | The finished front page, 1024 × 1024. |
+| `stories.json` | Every word and marker on the page, as data. |
+| `render.py` | Draws `entry.png` from `stories.json` plus a TopoJSON file. |
+| `main.ts` | Entry point: publishes `entry.png` to `$MAKEFUN_OUTPUT_DIR`. |
+| `LICENSE` | MIT. |
+
+## License
+
+MIT — see `LICENSE`.

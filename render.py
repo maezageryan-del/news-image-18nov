@@ -1,265 +1,318 @@
 #!/usr/bin/env python3
-"""Render the front page for a news-image daily bounty.
+"""Draw "The World in One Day" — a one-page newspaper for one day.
 
-Reads stories.json next to this file (lead, grid, also, markers, dateline)
-and draws a dense, legible newspaper front page at 1024x1024 with a
-dotted world map built from Natural Earth country outlines
-(countries-110m TopoJSON, decoded and rasterised here at build time).
+The page is a single 1024x1024 image.  Every word on it comes from
+stories.json, which sits beside this script; this file only knows
+about layout, typography and geography.
 
-The entry program (main.ts) only copies the finished entry.png, so the
-image bytes are fixed and both grader runs write identical output.
+Usage:
+    python3 render.py <countries-110m.json>
+
+The argument is a Natural Earth countries file in TopoJSON format
+(the 110 m resolution set).  Its shapes become the dotted world map
+in the middle band of the page.  The finished page is written to
+entry.png in the current directory.
 """
+
 import json
 import math
-import os
 import sys
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-W, H = 1024, 1024
-PAPER = (248, 244, 236)
-INK = (18, 18, 18)
-RED = (178, 28, 28)
-NAVY = (30, 58, 95)
-SLATE = (51, 65, 85)
-GREY = (90, 90, 90)
-RULE = (18, 18, 18)
+# ---------------------------------------------------------------- canvas
 
-FONT_DIR = "/usr/share/fonts/truetype/liberation"
+SIZE = 1024
+MARGIN = 46
+PAGE_W = SIZE - 2 * MARGIN
+
+INK = (24, 22, 20)
+PAPER = (250, 247, 240)
+FAINT = (110, 102, 92)
+ACCENT = (158, 32, 28)
+RULE = (24, 22, 20)
+
+HERE = Path(__file__).resolve().parent
+DATA_FILE = HERE / "stories.json"
+OUT_FILE = Path.cwd() / "entry.png"
+
+FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+FONT_BOLD_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
 
 
-def font(name, size):
-    return ImageFont.truetype(os.path.join(FONT_DIR, name), size)
+def font(size, bold=False):
+    """Best available TrueType font at `size`, else Pillow's bitmap."""
+    for path in FONT_BOLD_CANDIDATES if bold else FONT_CANDIDATES:
+        if Path(path).exists():
+            return ImageFont.truetype(path, size)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
-SERIF_B = lambda s: font("LiberationSerif-Bold.ttf", s)      # noqa: E731
-SERIF = lambda s: font("LiberationSerif-Regular.ttf", s)     # noqa: E731
-SERIF_I = lambda s: font("LiberationSerif-Italic.ttf", s)    # noqa: E731
-SANS_B = lambda s: font("LiberationSans-Bold.ttf", s)         # noqa: E731
-SANS = lambda s: font("LiberationSans-Regular.ttf", s)       # noqa: E731
-
-
-def wrap(draw, text, fnt, max_w):
-    """Greedy word wrap; returns list of lines that fit max_w."""
-    words = text.split()
-    lines, cur = [], ""
-    for w in words:
-        trial = (cur + " " + w).strip()
-        if draw.textlength(trial, font=fnt) <= max_w:
-            cur = trial
+def wrap(draw, text, fnt, width):
+    """Split `text` into lines that fit `width` pixels."""
+    lines, current = [], ""
+    for word in text.split():
+        trial = word if not current else current + " " + word
+        if draw.textlength(trial, font=fnt) <= width:
+            current = trial
         else:
-            if cur:
-                lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
     return lines
 
 
-def draw_wrapped(draw, x, y, text, fnt, max_w, fill=INK, leading=None, max_lines=None):
-    lines = wrap(draw, text, fnt, max_w)
-    if max_lines:
-        lines = lines[:max_lines]
-    lh = leading or int(fnt.size * 1.22)
-    for ln in lines:
-        draw.text((x, y), ln, font=fnt, fill=fill)
-        y += lh
+def centred(draw, cx, y, text, fnt, fill=INK):
+    draw.text((cx - draw.textlength(text, font=fnt) / 2, y), text,
+              font=fnt, fill=fill)
+    return y + fnt.size + 6
+
+
+def paragraph(draw, x, y, text, fnt, width, leading=1.25, fill=INK):
+    for line in wrap(draw, text, fnt, width):
+        draw.text((x, y), line, font=fnt, fill=fill)
+        y += int(fnt.size * leading)
     return y
 
 
-# ---------------- world map ----------------
-# Equirectangular crop: lon -180..180, lat -55..83 (138 degrees tall).
-LAT_TOP, LAT_BOT = 83.0, -55.0
+# ---------------------------------------------------------------- topojson
 
-
-def decode_topojson(path):
-    """Return a list of polygons; each is a list of (lon, lat) rings."""
-    with open(path) as fh:
-        topo = json.load(fh)
-    arcs = topo["arcs"]
-    tr = topo["transform"]
-    sx, sy = tr["scale"]
-    tx, ty = tr["translate"]
-    pts = []
-    for arc in arcs:
-        x, y = 0, 0
-        out = []
+def decode_arcs(topo):
+    """Expand TopoJSON arcs (delta encoded, optionally transformed)."""
+    transform = topo.get("transform")
+    scale = transform["scale"] if transform else (1.0, 1.0)
+    translate = transform["translate"] if transform else (0.0, 0.0)
+    decoded = []
+    for arc in topo["arcs"]:
+        x = y = 0
+        points = []
         for dx, dy in arc:
             x += dx
             y += dy
-            out.append((x * sx + tx, y * sy + ty))
-        pts.append(out)
-    polys = []
-    geoms = topo["objects"]["countries"]["geometries"]
-    for g in geoms:
-        # Antarctica adds only a fringe of dots at the map's bottom edge.
-        if (g.get("properties") or {}).get("name") == "Antarctica":
-            continue
-        t = g["type"]
-        arc_lists = g["arcs"]
-        if t == "Polygon":
-            rings = [arc_lists]
-        elif t == "MultiPolygon":
-            rings = arc_lists
-        else:
-            continue
-        for poly in rings:
-            decoded = []
-            for ring in poly:
-                ring_pts = []
-                for ai in ring:
-                    seg = pts[ai] if ai >= 0 else list(reversed(pts[~ai]))
-                    ring_pts.extend(seg)
-                decoded.append(ring_pts)
-            polys.append(decoded)
-    return polys
+            points.append((x * scale[0] + translate[0],
+                           y * scale[1] + translate[1]))
+        decoded.append(points)
+    return decoded
 
 
-def lonlat_to_xy(lon, lat, x0, y0, w, h):
-    x = x0 + (lon + 180.0) / 360.0 * w
-    y = y0 + (LAT_TOP - lat) / (LAT_TOP - LAT_BOT) * h
-    return x, y
+def stitch(arcs, indexes):
+    """Join the arcs named by `indexes` into one ring of points."""
+    ring = []
+    for idx in indexes:
+        arc = arcs[idx] if idx >= 0 else list(reversed(arcs[~idx]))
+        ring.extend(arc if not ring else arc[1:])
+    return ring
 
 
-def draw_map(draw, polys, x0, y0, w, h, markers):
-    # Land mask at panel resolution, then dotted sampling.
-    mask = Image.new("L", (w, h), 0)
-    md = ImageDraw.Draw(mask)
-    for poly in polys:
-        for ring in poly:
-            xy = [lonlat_to_xy(lon, lat, 0, 0, w, h) for lon, lat in ring]
-            md.polygon(xy, fill=255)
+def country_rings(topo):
+    """All polygon rings (lon/lat) of every geometry in the file."""
+    arcs = decode_arcs(topo)
+    rings = []
+    for obj in topo["objects"].values():
+        geoms = obj["geometries"] if obj["type"] == "GeometryCollection" \
+            else [obj]
+        for geom in geoms:
+            polys = geom["arcs"]
+            if geom["type"] == "Polygon":
+                polys = [polys]
+            for poly in polys:
+                for ring_indexes in poly:
+                    rings.append(stitch(arcs, ring_indexes))
+    return rings
+
+
+def inside(lon, lat, ring):
+    """Ray-casting point-in-polygon test for one ring."""
+    hit = False
+    px, py = ring[-1]
+    for x, y in ring:
+        if (y > lat) != (py > lat):
+            cross = (px - x) * (lat - y) / (py - y) + x
+            if lon < cross:
+                hit = not hit
+        px, py = x, y
+    return hit
+
+
+# ---------------------------------------------------------------- the map
+
+def draw_map(draw, rings, markers, box):
+    """A dotted equirectangular world with numbered story markers."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+
+    def project(lon, lat):
+        return (x0 + (lon + 180.0) / 360.0 * w,
+                y0 + (90.0 - lat) / 180.0 * h)
+
+    boxes = []
+    for ring in rings:
+        lons = [p[0] for p in ring]
+        lats = [p[1] for p in ring]
+        boxes.append((min(lons), min(lats), max(lons), max(lats)))
+
     step = 5
-    r = 1.7
-    px = mask.load()
-    for gy in range(2, h - 1, step):
-        for gx in range(2, w - 1, step):
-            if px[gx, gy]:
-                draw.ellipse([x0 + gx - r, y0 + gy - r,
-                              x0 + gx + r, y0 + gy + r], fill=SLATE)
-    # Graticule removed: a lone equator line read as a stray mark at
-    # this scale; the dotted continents carry the map on their own.
-    # Numbered story markers.
+    dot = 1.6
+    gy = y0 + step // 2
+    while gy < y1:
+        lat = 90.0 - (gy - y0) / h * 180.0
+        gx = x0 + step // 2
+        while gx < x1:
+            lon = (gx - x0) / w * 360.0 - 180.0
+            for ring, (lo0, la0, lo1, la1) in zip(rings, boxes):
+                if lo0 <= lon <= lo1 and la0 <= lat <= la1 and \
+                        inside(lon, lat, ring):
+                    draw.ellipse([gx - dot, gy - dot, gx + dot, gy + dot],
+                                 fill=(168, 158, 142))
+                    break
+            gx += step
+        gy += step
+
+    draw.rectangle(box, outline=RULE, width=1)
+
+    label_font = font(15, bold=True)
+    num_font = font(16, bold=True)
     for m in markers:
-        mx, my = lonlat_to_xy(m["lon"], m["lat"], x0, y0, w, h)
-        draw.ellipse([mx - 5, my - 5, mx + 5, my + 5], fill=RED,
-                     outline=(255, 255, 255), width=2)
-        lx, ly = mx + m.get("dx", 9), my + m.get("dy", -7)
-        draw.text((lx, ly), str(m["n"]), font=SANS_B(13), fill=RED)
+        cx, cy = project(m["lon"], m["lat"])
+        r = 13
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=ACCENT)
+        label = str(m["n"])
+        draw.text((cx - draw.textlength(label, font=num_font) / 2,
+                   cy - num_font.size / 2 - 1),
+                  label, font=num_font, fill=(255, 255, 255))
+        # Place the name beside its disc, but keep it inside the map:
+        # a label that would spill past either edge is pulled back.
+        lx = cx + m["dx"]
+        text_w = draw.textlength(m["label"], font=label_font)
+        lx = max(x0 + 2, min(lx, x1 - text_w - 2))
+        ly = max(y0 + 2, min(cy + m["dy"], y1 - label_font.size - 2))
+        draw.text((lx, ly), m["label"], font=label_font, fill=INK)
 
 
-# ---------------- front page ----------------
+# ---------------------------------------------------------------- sections
 
-def render(data, topo_path, out_path):
-    img = Image.new("RGB", (W, H), PAPER)
-    d = ImageDraw.Draw(img)
-    mx = 36
-    right = W - mx
-
-    # Masthead
-    d.rectangle([mx, 22, right, 27], fill=RULE)
-    title = data["masthead"]
-    tf = SERIF_B(60)
-    tw = d.textlength(title, font=tf)
-    d.text(((W - tw) / 2, 34), title, font=tf, fill=INK)
-    d.line([(mx, 104), (right, 104)], fill=RULE, width=2)
-    d.text((mx, 112), data["dateline"], font=SANS_B(16), fill=INK)
-    tag = data["tagline"]
-    tw = d.textlength(tag, font=SANS_B(16))
-    d.text((right - tw, 112), tag, font=SANS_B(16), fill=RED)
-    d.line([(mx, 136), (right, 136)], fill=RULE, width=1)
-
-    # Lead story
-    y = 148
-    d.text((mx, y), data["lead"]["kicker"], font=SANS_B(14), fill=RED)
+def story_block(draw, x, y, width, item, head_size, deck_size):
+    """One kicker/headline/deck story; returns the y below it."""
+    draw.text((x, y), item["kicker"], font=font(15, bold=True), fill=ACCENT)
     y += 22
-    y = draw_wrapped(d, mx, y, data["lead"]["headline"], SERIF_B(37),
-                     right - mx, leading=42, max_lines=2)
-    y += 4
-    y = draw_wrapped(d, mx, y, data["lead"]["deck"], SANS(16),
-                     right - mx, leading=21, max_lines=2)
+    y = paragraph(draw, x, y, item["headline"], font(head_size, bold=True),
+                  width, leading=1.12)
+    y += 2
+    y = paragraph(draw, x, y, item["deck"], font(deck_size), width,
+                  leading=1.25, fill=(52, 48, 44))
+    return y
+
+
+def build_page(data, rings):
+    img = Image.new("RGB", (SIZE, SIZE), PAPER)
+    draw = ImageDraw.Draw(img)
+    cx = SIZE // 2
+
+    # Masthead ------------------------------------------------------------
+    y = 30
+    y = centred(draw, cx, y, data["masthead"], font(64, bold=True))
+    draw.line([MARGIN, y, SIZE - MARGIN, y], fill=RULE, width=3)
     y += 10
-    d.line([(mx, y), (right, y)], fill=RULE, width=1)
+    left = data["dateline"]
+    right = data["tagline"]
+    small = font(17, bold=True)
+    draw.text((MARGIN, y), left, font=small, fill=INK)
+    draw.text((SIZE - MARGIN - draw.textlength(right, font=small), y),
+              right, font=small, fill=INK)
+    y += 30
+    draw.line([MARGIN, y, SIZE - MARGIN, y], fill=RULE, width=1)
+    y += 18
+
+    # Lead ----------------------------------------------------------------
+    lead = data["lead"]
+    draw.text((MARGIN, y), lead["kicker"], font=font(17, bold=True),
+              fill=ACCENT)
+    y += 26
+    y = paragraph(draw, MARGIN, y, lead["headline"], font(47, bold=True),
+                  PAGE_W, leading=1.08)
+    y += 4
+    y = paragraph(draw, MARGIN, y, lead["deck"], font(20), PAGE_W,
+                  leading=1.3, fill=(52, 48, 44))
+    y += 16
+
+    # Map band ------------------------------------------------------------
+    map_h = 218
+    draw_map(draw, rings, data["markers"], (MARGIN, y, SIZE - MARGIN,
+                                            y + map_h))
+    y += map_h + 20
+
+    # Three columns ---------------------------------------------------------
+    gap = 26
+    col_w = (PAGE_W - 2 * gap) // 3
+    col_bottom = y
+    for i, item in enumerate(data["column"]):
+        x = MARGIN + i * (col_w + gap)
+        if i:
+            draw.line([x - gap // 2, y, x - gap // 2, y + 168],
+                      fill=(196, 188, 172), width=1)
+        col_bottom = max(col_bottom,
+                         story_block(draw, x, y, col_w, item, 21, 15))
+    y = col_bottom + 14
+    draw.line([MARGIN, y, SIZE - MARGIN, y], fill=RULE, width=1)
+    y += 14
+
+    # Six-story grid --------------------------------------------------------
+    for row in range(2):
+        cell_bottom = y
+        for col in range(3):
+            item = data["grid"][row * 3 + col]
+            x = MARGIN + col * (col_w + gap)
+            cell_bottom = max(cell_bottom,
+                              story_block(draw, x, y, col_w, item, 18, 14))
+        y = cell_bottom + 12
+    draw.line([MARGIN, y, SIZE - MARGIN, y], fill=RULE, width=1)
     y += 12
 
-    # Middle band: map (left) + three medium stories (right)
-    band_y = y
-    map_w, map_h = 524, 190
-    d.text((mx, band_y), "WHERE THE DAY HAPPENED",
-           font=SANS_B(14), fill=INK)
-    d.text((mx + 218, band_y), "— numbered places in today's stories",
-           font=SANS(13), fill=GREY)
-    polys = decode_topojson(topo_path)
-    draw_map(d, polys, mx, band_y + 22, map_w, map_h, data["markers"])
-    key_y = band_y + 22 + map_h + 6
-    key = "  ·  ".join(f"{m['n']} {m['label']}" for m in data["markers"])
-    draw_wrapped(d, mx, key_y, key, SANS(11), map_w, leading=14, max_lines=2)
-
-    # Right column: three medium stories
-    rx, rw = 584, right - 584
-    ry = band_y
-    for s in data["column"]:
-        d.text((rx, ry), s["kicker"], font=SANS_B(12), fill=RED)
-        ry += 17
-        ry = draw_wrapped(d, rx, ry, s["headline"], SERIF_B(19), rw,
-                          leading=22, max_lines=2)
-        ry = draw_wrapped(d, rx, ry, s["deck"], SANS(13), rw,
-                          leading=16, max_lines=2)
-        ry += 6
-        d.line([(rx, ry), (right, ry)], fill=(200, 195, 185), width=1)
-        ry += 10
-    band_bottom = max(key_y + 28, ry)
-    y = band_bottom + 2
-    d.line([(mx, y), (right, y)], fill=RULE, width=1)
-    y += 10
-
-    # Grid: 3 columns x 2 rows
-    cols = 3
-    cw = (right - mx - 2 * 24) // cols
-    gy = y
-    for i, s in enumerate(data["grid"]):
-        col = i % cols
-        row = i // cols
-        x = mx + col * (cw + 24)
-        yy = gy + row * 96
-        d.text((x, yy), s["kicker"], font=SANS_B(12), fill=RED)
-        yy += 17
-        yy = draw_wrapped(d, x, yy, s["headline"], SERIF_B(18), cw,
-                          leading=21, max_lines=2)
-        draw_wrapped(d, x, yy, s["deck"], SANS(12), cw, leading=15,
-                     max_lines=2)
-    y = gy + 2 * 96 + 4
-    d.line([(mx, y), (right, y)], fill=RULE, width=1)
-    y += 10
-
-    # Also today: 3 columns of compact one-liners
-    d.text((mx, y), "ALSO TODAY", font=SANS_B(14), fill=INK)
-    y += 22
-    ay = y
+    # Also today ------------------------------------------------------------
+    draw.text((MARGIN, y), "ALSO TODAY", font=font(16, bold=True),
+              fill=ACCENT)
+    y += 24
+    brief = font(13)
     per_col = math.ceil(len(data["also"]) / 3)
     for col in range(3):
-        x = mx + col * (cw + 24)
-        yy = ay
-        for s in data["also"][col * per_col:(col + 1) * per_col]:
-            yy = draw_wrapped(d, x, yy, s, SERIF_B(13), cw, leading=15,
-                              max_lines=2)
-            yy += 5
-    y = ay + per_col * 35 + 6
-    d.line([(mx, y), (right, y)], fill=RULE, width=1)
-    y += 8
-    d.text((mx, y), data["footer"], font=SANS(11), fill=GREY)
+        x = MARGIN + col * (col_w + gap)
+        yy = y
+        for item in data["also"][col * per_col:(col + 1) * per_col]:
+            yy = paragraph(draw, x, yy, "· " + item, brief, col_w,
+                           leading=1.2, fill=(52, 48, 44))
+            yy += 3
+    y = SIZE - MARGIN - 26
 
-    img.save(out_path, "PNG", optimize=True)
-    size = os.path.getsize(out_path)
-    print(f"wrote {out_path}: {img.size}, {size} bytes")
-    if size > 1_048_576:
-        img.save(out_path, "JPEG", quality=88, optimize=True)
-        print(f"over 1 MiB as PNG; saved JPEG: {os.path.getsize(out_path)} bytes")
+    # Footer ----------------------------------------------------------------
+    draw.line([MARGIN, y, SIZE - MARGIN, y], fill=RULE, width=1)
+    centred(draw, cx, y + 8, data["footer"], font(13), fill=FAINT)
+
+    return img
+
+
+def main(argv):
+    if len(argv) != 2:
+        print("usage: render.py <countries-110m.json>", file=sys.stderr)
+        return 2
+    data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    topo = json.loads(Path(argv[1]).read_text(encoding="utf-8"))
+    page = build_page(data, country_rings(topo))
+    page.save(OUT_FILE)
+    print(f"wrote {OUT_FILE} ({OUT_FILE.stat().st_size} bytes)")
+    return 0
 
 
 if __name__ == "__main__":
-    with open(os.path.join(HERE, "stories.json")) as fh:
-        data = json.load(fh)
-    topo = sys.argv[1] if len(sys.argv) > 1 else "/tmp/countries-110m.json"
-    render(data, topo, os.path.join(HERE, "entry.png"))
+    raise SystemExit(main(sys.argv))
